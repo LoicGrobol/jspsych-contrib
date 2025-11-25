@@ -1,5 +1,4 @@
 import { JsPsych, JsPsychPlugin, ParameterType, TrialType } from "jspsych";
-import { KeyboardListener } from "jspsych/dist/modules/plugin-api/KeyboardListenerAPI";
 
 import { version } from "../package.json";
 
@@ -97,8 +96,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
   display_element: HTMLElement;
   canvas_colour: string;
   center_display: HTMLElement;
-  font_colour: string;
-  keyboard_listener: KeyboardListener;
+  keyboard_listener: any; // Should be KeyboardListener but how to import it
   keys: { left: string; right: string };
   left_display: HTMLElement;
   right_display: HTMLElement;
@@ -156,7 +154,6 @@ class MazePlugin implements JsPsychPlugin<Info> {
     this.right_display = document.getElementById("jspsych-maze-right_display");
     this.text_display = document.getElementById("jspsych-maze-text_display");
 
-    this.font_colour = trial.font_colour;
     this.keys = trial.keys;
 
     const results: {
@@ -180,17 +177,14 @@ class MazePlugin implements JsPsychPlugin<Info> {
       this.display_words(left, right);
     };
 
-    const after_response = (info: { rt: number; key: string }) => {
-      const rt = info.rt - last_display_time;
-      const correct = word_on_the_left[word_number]
-        ? this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left)
-        : this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.right);
+    const after_response = (epoch: number, response_is_left: boolean) => {
+      const correct = word_on_the_left[word_number] === response_is_left;
       const [word, foil] = trial.sentence[word_number];
       // FIXME: maybe we want to pre-allocate trial_data.events for more reactivity?
       results.events.push({
         correct: correct,
         foil: foil,
-        rt: rt,
+        rt: epoch - last_display_time,
         side: word_on_the_left[word_number] ? "left" : "right",
         word: word,
       } as Response);
@@ -201,7 +195,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
           () => step_display(word_number),
           trial.inter_word_interval
         );
-        last_display_time = info.rt + trial.inter_word_interval;
+        last_display_time = epoch + trial.inter_word_interval;
       } else {
         end_trial();
       }
@@ -214,7 +208,9 @@ class MazePlugin implements JsPsychPlugin<Info> {
       // we ensure that keypresses before display will be ignored (since the display happens at
       // inter_word_interval).
       this.keyboard_listener = this.jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: after_response,
+        callback_function: (info: { rt: number; key: string }) => {
+          after_response(info.rt, this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left));
+        },
         valid_responses: [this.keys.left, this.keys.right],
         rt_method: "performance",
         persist: true,
