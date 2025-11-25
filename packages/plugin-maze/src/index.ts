@@ -96,7 +96,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
   display_element: HTMLElement;
   canvas_colour: string;
   center_display: HTMLElement;
-  keyboard_listener: any; // Should be KeyboardListener but how to import it
+  keyboard_listener: any; // Should be KeyboardListener but it's jspsych doesn't export the type :)
   keys: { left: string; right: string };
   left_display: HTMLElement;
   right_display: HTMLElement;
@@ -177,39 +177,42 @@ class MazePlugin implements JsPsychPlugin<Info> {
       this.display_words(left, right);
     };
 
-    const after_response = (epoch: number, response_is_left: boolean) => {
+    const process_response = (interval: number, response_is_left: boolean) => {
       const correct = word_on_the_left[word_number] === response_is_left;
       const [word, foil] = trial.sentence[word_number];
       // FIXME: maybe we want to pre-allocate trial_data.events for more reactivity?
       results.events.push({
         correct: correct,
         foil: foil,
-        rt: epoch - last_display_time,
+        rt: interval,
         side: word_on_the_left[word_number] ? "left" : "right",
         word: word,
       } as Response);
       if (word_number < trial.sentence.length - 1 && (correct || !trial.halt_on_error)) {
         word_number++;
         this.clear_display();
-        this.jsPsych.pluginAPI.setTimeout(
-          () => step_display(word_number),
-          trial.inter_word_interval
-        );
-        last_display_time = epoch + trial.inter_word_interval;
+        this.jsPsych.pluginAPI.setTimeout(() => {
+          step_display(word_number);
+          last_display_time = performance.now();
+        }, trial.inter_word_interval);
       } else {
         end_trial();
       }
     };
 
-    const start_trial = (info: { rt: number; key: string }) => {
+    const start_trial = () => {
       step_display(0);
-      last_display_time = 0;
+      last_display_time = performance.now();
       // TODO: there's trickery here: by enforcing at least inter_word_interval beteween keypresses,
       // we ensure that keypresses before display will be ignored (since the display happens at
-      // inter_word_interval).
+      // inter_word_interval). ALternatively we could create and destroy a new keyboard listener for
+      // each trial step.
       this.keyboard_listener = this.jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: (info: { rt: number; key: string }) => {
-          after_response(info.rt, this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left));
+        callback_function: (info: { key: string; rt: number }) => {
+          process_response(
+            performance.now() - last_display_time,
+            this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left)
+          );
         },
         valid_responses: [this.keys.left, this.keys.right],
         rt_method: "performance",
@@ -227,7 +230,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
     const setup = () => {
       this.display_message(`Press ${this.keys.left} or ${this.keys.right} to start`);
       this.keyboard_listener = this.jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: start_trial,
+        callback_function: (info: { key: string; rt: number }) => start_trial(),
         valid_responses: [this.keys.left, this.keys.right],
         persist: false,
         allow_held_key: false,
