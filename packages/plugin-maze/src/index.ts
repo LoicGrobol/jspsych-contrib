@@ -95,7 +95,9 @@ class MazePlugin implements JsPsychPlugin<Info> {
   static info = info;
   display_element: HTMLElement;
   canvas_colour: string;
+  center_clientX: number;
   center_display: HTMLElement;
+  display_parent: HTMLElement;
   keys: { left: string; right: string };
   left_display: HTMLElement;
   right_display: HTMLElement;
@@ -115,39 +117,41 @@ class MazePlugin implements JsPsychPlugin<Info> {
       </div>`;
     this.style = document.createElement("style");
     this.style.innerHTML = `
-      #jspsych-maze-display_parent {
-        position: relative;
-        width: ${trial.canvas_size[0]};
-        height: ${trial.canvas_size[1]};
-      }
-      .jspsych-maze-display{
-        position: absolute;
-      }
-      .jspsych-maze-answer{
-        width: max-content;
-      }
-      #jspsych-maze-center_display {
-        top: 50%;
-        transform: translateY(-50%);
-        width: 100%;
-      }
-      #jspsych-maze-text_display {
-        top: 50%;
-        transform: translateY(-50%) translateY(-5em);
-        width: 100%;
-      }
-      #jspsych-maze-left_display {
-        left: calc(100% / 3);
-        top: 50%;
-        transform: translate(-50%, -50%);
-      }
-      #jspsych-maze-right_display {
-        left: calc(2 * (100% / 3));
-        top: 50%;
-        transform: translate(-50%, -50%);
-      }
+		#jspsych-maze-display_parent {
+			position: relative;
+			width: ${trial.canvas_size[0]};
+			height: ${trial.canvas_size[1]};
+		}
+		.jspsych-maze-display{
+			position: absolute;
+		}
+		.jspsych-maze-answer{
+			width: max-content;
+		}
+		#jspsych-maze-center_display {
+			top: 50%;
+			transform: translateY(-50%);
+			width: 100%;
+		}
+		#jspsych-maze-text_display {
+			top: 50%;
+			transform: translateY(-50%) translateY(-5em);
+			width: 100%;
+		}
+		#jspsych-maze-left_display {
+			left: calc(100% / 3);
+			top: 50%;
+			transform: translate(-50%, -50%);
+		}
+		#jspsych-maze-right_display {
+			left: calc(2 * (100% / 3));
+			top: 50%;
+			transform: translate(-50%, -50%);
+		}
       `;
     document.head.appendChild(this.style);
+    this.display_parent = document.getElementById("jspsych-maze-display_parent");
+    this.center_clientX = this.display_element.clientLeft + 0.5 * this.display_element.clientWidth;
     this.center_display = document.getElementById("jspsych-maze-center_display");
     this.left_display = document.getElementById("jspsych-maze-left_display");
     this.right_display = document.getElementById("jspsych-maze-right_display");
@@ -176,6 +180,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
         }
         callback(response_is_left);
       };
+
       // NOTE: could do it with native events but this has the benefit of having just one true
       // listener at all time (see implementation of getKeyBoardResponse)
       const keyboard_listener = this.jsPsych.pluginAPI.getKeyboardResponse({
@@ -187,6 +192,23 @@ class MazePlugin implements JsPsychPlugin<Info> {
         allow_held_key: false,
       });
       cancelers.push(() => this.jsPsych.pluginAPI.cancelKeyboardResponse(keyboard_listener));
+
+      const touch_controller = new AbortController();
+      this.jsPsych.getDisplayContainerElement().addEventListener(
+        "touchstart",
+        (e) => {
+          e.preventDefault();
+
+          if (e.changedTouches[0].clientX < this.center_clientX) {
+            next("touch", true);
+          } else {
+            next("touch", false);
+          }
+        },
+        { signal: touch_controller.signal }
+      );
+      // Annoying to have to wrap here but eh
+      cancelers.push(() => touch_controller.abort());
     };
 
     const start_step = (word_number: number) => {
@@ -237,12 +259,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
 
     const setup = () => {
       this.display_message(`Press ${this.keys.left} or ${this.keys.right} to start`);
-      this.jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: (info: { key: string; rt: number }) => start_trial(),
-        valid_responses: [this.keys.left, this.keys.right],
-        persist: false,
-        allow_held_key: false,
-      });
+      listen_input((response_is_left) => start_trial());
     };
 
     setup();
@@ -272,7 +289,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
   }
 }
 
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
