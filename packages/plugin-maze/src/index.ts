@@ -117,6 +117,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
       </div>`;
     this.style = document.createElement("style");
     this.style.innerHTML = `
+		html, body { overscroll-behavior-y: contain; }
 		#jspsych-maze-display_parent {
 			position: relative;
 			width: ${trial.canvas_size[0]};
@@ -127,6 +128,9 @@ class MazePlugin implements JsPsychPlugin<Info> {
 		}
 		.jspsych-maze-answer{
 			width: max-content;
+		}
+		.highlighted {
+			border: 2px solid red;
 		}
 		#jspsych-maze-center_display {
 			top: 50%;
@@ -193,22 +197,26 @@ class MazePlugin implements JsPsychPlugin<Info> {
       });
       cancelers.push(() => this.jsPsych.pluginAPI.cancelKeyboardResponse(keyboard_listener));
 
-      const touch_controller = new AbortController();
-      this.jsPsych.getDisplayContainerElement().addEventListener(
-        "touchstart",
-        (e) => {
-          e.preventDefault();
-
-          if (e.changedTouches[0].clientX < this.center_clientX) {
-            next("touch", true);
-          } else {
-            next("touch", false);
-          }
+      const swipe_listener = listen_to_swipe(
+        this.jsPsych.getDisplayContainerElement(),
+        (response_is_left) => {
+          this.left_display.classList.remove("highlighted");
+          this.right_display.classList.remove("highlighted");
+          next("touch", response_is_left);
         },
-        { signal: touch_controller.signal }
+        {
+          move_callback: (start_touch: Touch, current_touch: Touch) => {
+            if (current_touch.pageX < start_touch.pageX) {
+              this.left_display.classList.add("highlighted");
+              this.right_display.classList.remove("highlighted");
+            } else {
+              this.left_display.classList.remove("highlighted");
+              this.right_display.classList.add("highlighted");
+            }
+          },
+        }
       );
-      // Annoying to have to wrap here but eh
-      cancelers.push(() => touch_controller.abort());
+      cancelers.push(swipe_listener);
     };
 
     const start_step = (word_number: number) => {
@@ -291,6 +299,75 @@ class MazePlugin implements JsPsychPlugin<Info> {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function listen_to_swipe(
+  element: HTMLElement,
+  callback: (response_is_left: boolean) => void,
+  options: {
+    touch_callback?: (touch: Touch) => void;
+    move_callback?: (start_touch: Touch, current_touch: Touch) => void;
+    min_distance?: number;
+  } = {}
+) {
+  const min_distance = options.min_distance ?? 0;
+  const touch_controller = new AbortController();
+  const ongoingTouches = new Map<number, Touch>();
+  element.addEventListener(
+    "touchstart",
+    (e) => {
+      e.preventDefault();
+      for (const touch of e.changedTouches) {
+        ongoingTouches.set(touch.identifier, touch);
+        if (options.touch_callback) {
+          options.touch_callback(touch);
+        }
+      }
+    },
+    { signal: touch_controller.signal }
+  );
+
+  if (options.move_callback) {
+    element.addEventListener(
+      "touchmove",
+      (e) => {
+        e.preventDefault();
+        for (const current_touch of e.changedTouches) {
+          const start_touch = ongoingTouches.get(current_touch.identifier);
+          options.move_callback(start_touch, current_touch);
+        }
+      },
+      { signal: touch_controller.signal }
+    );
+  }
+
+  element.addEventListener(
+    "touchcancel",
+    (e) => {
+      e.preventDefault();
+      for (const touch of e.changedTouches) {
+        ongoingTouches.delete(touch.identifier);
+      }
+    },
+    { signal: touch_controller.signal }
+  );
+
+  element.addEventListener(
+    "touchend",
+    (e) => {
+      e.preventDefault();
+      for (const end_touch of e.changedTouches) {
+        const start_touch = ongoingTouches.get(end_touch.identifier);
+        if (end_touch.pageX < start_touch.pageX - min_distance) {
+          callback(true);
+        } else if (end_touch.pageX > start_touch.pageX + min_distance) {
+          callback(false);
+        }
+      }
+    },
+    { signal: touch_controller.signal }
+  );
+  return () => touch_controller.abort();
 }
 
 export default MazePlugin;
