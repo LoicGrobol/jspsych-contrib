@@ -164,20 +164,32 @@ class MazePlugin implements JsPsychPlugin<Info> {
       events: [],
     };
 
-    let last_display_time: number;
-    let word_number = 0;
     const word_on_the_left = Array.from(
       { length: trial.sentence.length },
       (_value, _index) => Math.random() < 0.5
     );
 
-    const step_display = (n: number) => {
-      const [word, foil] = trial.sentence[n];
-      const [left, right] = word_on_the_left[n] ? [word, foil] : [foil, word];
+    const start_step = (word_number: number) => {
+      const [word, foil] = trial.sentence[word_number];
+      const [left, right] = word_on_the_left[word_number] ? [word, foil] : [foil, word];
       this.display_words(left, right);
+      const last_display_time = performance.now();
+      this.jsPsych.pluginAPI.getKeyboardResponse({
+        callback_function: (info: { key: string; rt: number }) => {
+          process_response(
+            performance.now() - last_display_time,
+            word_number,
+            this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left)
+          );
+        },
+        valid_responses: [this.keys.left, this.keys.right],
+        rt_method: "performance",
+        allow_held_key: false,
+        minimum_valid_rt: trial.pre_answer_interval,
+      });
     };
 
-    const process_response = (interval: number, response_is_left: boolean) => {
+    const process_response = (interval: number, word_number: number, response_is_left: boolean) => {
       const correct = word_on_the_left[word_number] === response_is_left;
       const [word, foil] = trial.sentence[word_number];
       // FIXME: maybe we want to pre-allocate trial_data.events for more reactivity?
@@ -189,41 +201,21 @@ class MazePlugin implements JsPsychPlugin<Info> {
         word: word,
       } as Response);
       if (word_number < trial.sentence.length - 1 && (correct || !trial.halt_on_error)) {
-        word_number++;
         this.clear_display();
-        this.jsPsych.pluginAPI.setTimeout(() => {
-          step_display(word_number);
-          last_display_time = performance.now();
-        }, trial.inter_word_interval);
+        this.jsPsych.pluginAPI.setTimeout(
+          () => start_step(word_number + 1),
+          trial.inter_word_interval
+        );
       } else {
         end_trial();
       }
     };
 
     const start_trial = () => {
-      step_display(0);
-      last_display_time = performance.now();
-      // TODO: there's trickery here: by enforcing at least inter_word_interval beteween keypresses,
-      // we ensure that keypresses before display will be ignored (since the display happens at
-      // inter_word_interval). ALternatively we could create and destroy a new keyboard listener for
-      // each trial step.
-      this.keyboard_listener = this.jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: (info: { key: string; rt: number }) => {
-          process_response(
-            performance.now() - last_display_time,
-            this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left)
-          );
-        },
-        valid_responses: [this.keys.left, this.keys.right],
-        rt_method: "performance",
-        persist: true,
-        allow_held_key: false,
-        minimum_valid_rt: trial.inter_word_interval + trial.pre_answer_interval,
-      });
+      start_step(0);
     };
 
     const end_trial = () => {
-      this.jsPsych.pluginAPI.cancelKeyboardResponse(this.keyboard_listener);
       this.jsPsych.finishTrial(results);
     };
 
