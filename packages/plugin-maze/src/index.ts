@@ -168,24 +168,31 @@ class MazePlugin implements JsPsychPlugin<Info> {
       (_value, _index) => Math.random() < 0.5
     );
 
+    const listen_input = (callback: (response_is_left: boolean) => void) => {
+      this.jsPsych.pluginAPI.getKeyboardResponse({
+        callback_function: (info: { key: string; rt: number }) => {
+          callback(this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left));
+        },
+        valid_responses: [this.keys.left, this.keys.right],
+        rt_method: "performance",
+        allow_held_key: false,
+      });
+    };
+
     const start_step = (word_number: number) => {
       const [word, foil] = trial.sentence[word_number];
       const [left, right] = word_on_the_left[word_number] ? [word, foil] : [foil, word];
       this.display_words(left, right);
       const last_display_time = performance.now();
-      this.jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: (info: { key: string; rt: number }) => {
-          process_response(
-            performance.now() - last_display_time,
-            word_number,
-            this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left)
-          );
-        },
-        valid_responses: [this.keys.left, this.keys.right],
-        rt_method: "performance",
-        allow_held_key: false,
-        minimum_valid_rt: trial.pre_answer_interval,
-      });
+      // TODO: I would like to await sleep() here but I haven't figured out how to make jest work
+      // with that yet
+      this.jsPsych.pluginAPI.setTimeout(
+        () =>
+          listen_input((response_is_left: boolean) => {
+            process_response(performance.now() - last_display_time, word_number, response_is_left);
+          }),
+        trial.pre_answer_interval
+      );
     };
 
     const process_response = (interval: number, word_number: number, response_is_left: boolean) => {
@@ -253,6 +260,10 @@ class MazePlugin implements JsPsychPlugin<Info> {
     this.clear_display();
     this.center_display.innerHTML = message;
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default MazePlugin;
