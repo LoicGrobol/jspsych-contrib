@@ -96,7 +96,6 @@ class MazePlugin implements JsPsychPlugin<Info> {
   display_element: HTMLElement;
   canvas_colour: string;
   center_display: HTMLElement;
-  keyboard_listener: any; // Should be KeyboardListener but it's jspsych doesn't export the type :)
   keys: { left: string; right: string };
   left_display: HTMLElement;
   right_display: HTMLElement;
@@ -221,7 +220,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
 
     const setup = () => {
       this.display_message(`Press ${this.keys.left} or ${this.keys.right} to start`);
-      this.keyboard_listener = this.jsPsych.pluginAPI.getKeyboardResponse({
+      this.jsPsych.pluginAPI.getKeyboardResponse({
         callback_function: (info: { key: string; rt: number }) => start_trial(),
         valid_responses: [this.keys.left, this.keys.right],
         persist: false,
