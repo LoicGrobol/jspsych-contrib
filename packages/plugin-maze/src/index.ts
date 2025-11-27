@@ -169,14 +169,24 @@ class MazePlugin implements JsPsychPlugin<Info> {
     );
 
     const listen_input = (callback: (response_is_left: boolean) => void) => {
-      this.jsPsych.pluginAPI.getKeyboardResponse({
+      const cancelers: Array<() => void> = [];
+      const next = (input_type: string, response_is_left: boolean) => {
+        for (const handle of cancelers) {
+          handle();
+        }
+        callback(response_is_left);
+      };
+      // NOTE: could do it with native events but this has the benefit of having just one true
+      // listener at all time (see implementation of getKeyBoardResponse)
+      const keyboard_listener = this.jsPsych.pluginAPI.getKeyboardResponse({
         callback_function: (info: { key: string; rt: number }) => {
-          callback(this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left));
+          next("keyboard", this.jsPsych.pluginAPI.compareKeys(info.key, this.keys.left));
         },
         valid_responses: [this.keys.left, this.keys.right],
         rt_method: "performance",
         allow_held_key: false,
       });
+      cancelers.push(() => this.jsPsych.pluginAPI.cancelKeyboardResponse(keyboard_listener));
     };
 
     const start_step = (word_number: number) => {
