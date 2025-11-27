@@ -39,20 +39,22 @@
           type: jsPsychHtmlSwipeResponse,
           stimulus: () => jsPsych.evaluateTimelineVariable("question").text,
           keyboard_choices: ["f", "j"],
-          prompt: () => `
-                <span style="margin: 5em 8em 0 8em; display: inline-block;">${
-                  jsPsych.evaluateTimelineVariable("question").left
-                }</span>
-                <span style="margin: 5em 8em 0 8em; display: inline-block;">${
-                  jsPsych.evaluateTimelineVariable("question").right
-                }</span>`,
+          button_choices: () => [
+            jsPsych.evaluateTimelineVariable("question").left,
+            jsPsych.evaluateTimelineVariable("question").right,
+          ],
           on_finish: (data) => {
-            const correct_side = jsPsych.evaluateTimelineVariable("question").correct;
+            const correct_side =
+               jsPsych.evaluateTimelineVariable("question").correct;
+               let success;
             if (data.keyboard_response) {
               success = jsPsych.pluginAPI.compareKeys(
                 data.response,
                 "left" === correct_side ? "f" : "j"
               );
+            } else if (data.button_response) {
+              success =
+                data.button_response === ("left" === correct_side ? 0 : 1);
             } else {
               success = data.swipe_response === correct_side;
             }
