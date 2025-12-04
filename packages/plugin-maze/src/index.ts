@@ -24,6 +24,12 @@ const info = <const>{
       pretty_name: "Halt on error",
       default: false,
     },
+    /** The instruction to display at the beginning of the trial */
+    instruction: {
+      type: ParameterType.STRING,
+      pretty_name: "Instruction",
+      default: null,
+    },
     /** How long to wait on a blank screen before displaying the next word. */
     inter_word_interval: {
       type: ParameterType.INT,
@@ -98,6 +104,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
   center_clientX: number;
   center_display: HTMLElement;
   display_parent: HTMLElement;
+  instruction: string;
   keys: { left: string; right: string };
   left_display: HTMLElement;
   right_display: HTMLElement;
@@ -162,6 +169,9 @@ class MazePlugin implements JsPsychPlugin<Info> {
     this.text_display = document.getElementById("jspsych-maze-text_display");
 
     this.keys = trial.keys;
+    console.log(trial);
+    this.instruction =
+      trial.instruction ?? `Press ${this.keys.left} or ${this.keys.right} to start`;
 
     const results: {
       sentence: string;
@@ -266,7 +276,7 @@ class MazePlugin implements JsPsychPlugin<Info> {
     };
 
     const setup = () => {
-      this.display_message(`Press ${this.keys.left} or ${this.keys.right} to start`);
+      this.display_message(this.instruction);
       listen_input((_) => start_trial());
     };
 
