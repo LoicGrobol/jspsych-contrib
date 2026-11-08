@@ -2,7 +2,12 @@
   "extends": "@jspsych/config/tsconfig.contrib.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+	"lib": [
+		"dom",
+		"DOM.Iterable",
+		"esnext"
+	],
   },
   "include": ["src"]
 }
