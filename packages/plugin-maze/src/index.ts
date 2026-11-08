@@ -69,6 +69,8 @@ const info = <const>{
         correct: { type: ParameterType.BOOL },
         foil: { type: ParameterType.STRING },
         rt: { type: ParameterType.INT },
+        display_atime: { type: ParameterType.INT },
+        response_atime: { type: ParameterType.INT },
         side: { type: ParameterType.STRING },
         word: { type: ParameterType.STRING },
         word_number: { type: ParameterType.INT },
@@ -119,8 +121,8 @@ class MazePlugin implements JsPsychPlugin<Info> {
       <div id="jspsych-maze-display_parent">
         <div id="jspsych-maze-center_display" class="jspsych-maze-display"></div>
         <div id="jspsych-maze-text_display" class="jspsych-maze-display"></div>
-        <div id="jspsych-maze-left_display" class="jspsych-maze-display jspsy-maze-answer"></div>
-        <div id="jspsych-maze-right_display" class="jspsych-maze-display jspsy-maze-answer"></div>
+        <div id="jspsych-maze-left_display" class="jspsych-maze-display jspsych-maze-answer"></div>
+        <div id="jspsych-maze-right_display" class="jspsych-maze-display jspsych-maze-answer"></div>
       </div>`;
     this.style = document.createElement("style");
     this.style.innerHTML = `
@@ -239,20 +241,27 @@ class MazePlugin implements JsPsychPlugin<Info> {
       this.jsPsych.pluginAPI.setTimeout(
         () =>
           listen_input((response_is_left: boolean) => {
-            process_response(performance.now() - last_display_time, word_number, response_is_left);
+            process_response(performance.now(), last_display_time, word_number, response_is_left);
           }),
         trial.pre_answer_interval
       );
     };
 
-    const process_response = (interval: number, word_number: number, response_is_left: boolean) => {
+    const process_response = (
+      response_atime: number,
+      display_atime: number,
+      word_number: number,
+      response_is_left: boolean
+    ) => {
       const correct = word_on_the_left[word_number] === response_is_left;
       const [word, foil] = trial.sentence[word_number];
       // FIXME: maybe we want to pre-allocate trial_data.events for more reactivity?
       results.events.push({
         correct: correct,
         foil: foil,
-        rt: interval,
+        rt: response_atime - display_atime,
+        response_atime: response_atime,
+        display_atime: display_atime,
         side: word_on_the_left[word_number] ? "left" : "right",
         word: word,
       } as Response);
@@ -319,7 +328,7 @@ function listen_to_swipe(
     move_callback?: (start_touch: Touch, current_touch: Touch) => void;
     min_distance?: number;
   } = {}
-) {
+): () => void {
   const min_distance = options.min_distance ?? 0;
   const touch_controller = new AbortController();
   const ongoingTouches = new Map<number, Touch>();

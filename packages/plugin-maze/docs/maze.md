@@ -29,7 +29,7 @@ plugin collects the following data for each trial.
 | Name       | Type                                                                                         | Value                                                                     |
 |------------|----------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
 | `sentence` | `string`                                                                                     | The sentence used in the trial (joined with spaces)                       |
-| `events`   | `Array<{correct: boolean, foil: string, rt: number, side: "left" \| "right", word: string}>` | The parameters, choice and interaction time for each word of the sentence |
+| `events`   | `Array<{correct: boolean, foil: string, rt: number, display_atime: number, response_atime: number, side: "left" \| "right", word: string}>` | The parameters, choice and interaction time for each word of the sentence |
 
 ## Install
 
