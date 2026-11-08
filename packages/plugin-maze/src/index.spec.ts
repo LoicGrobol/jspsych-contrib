@@ -29,15 +29,16 @@ describe("The maze jspsych plugin", () => {
 
     // Start
     jest.advanceTimersByTime(100);
-    pressKey("f");
+    await pressKey("f");
 
     // This one is too fast and should be ignored
     jest.advanceTimersByTime(10);
-    pressKey("f");
+    await pressKey("f");
 
     for (const [_word, _foil] of sentence) {
+      console.log(`${_word} - ${_foil}`);
       jest.advanceTimersByTime(100);
-      pressKey("f");
+      await pressKey("f");
     }
 
     await expectFinished();

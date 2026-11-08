@@ -260,8 +260,8 @@ class MazePlugin implements JsPsychPlugin<Info> {
         correct: correct,
         foil: foil,
         rt: response_atime - display_atime,
-        response_atime: response_atime,
         display_atime: display_atime,
+        response_atime: response_atime,
         side: word_on_the_left[word_number] ? "left" : "right",
         word: word,
       } as Response);
